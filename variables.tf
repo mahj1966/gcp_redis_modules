@@ -1,16 +1,15 @@
-
-##############################
-# Variables principales
-##############################
+########################################
+# Variables principales pour l'instance
+########################################
 
 variable "project_id" {
   type        = string
-  description = "ID du projet GCP dans lequel créer l'instance Redis."
+  description = "ID du projet GCP où créer l'instance Redis."
 }
 
 variable "region" {
   type        = string
-  description = "Région GCP où déployer l'instance Redis (ex: us-central1)."
+  description = "Région GCP pour l'instance Redis (ex: us-central1)."
 }
 
 variable "name" {
@@ -20,7 +19,7 @@ variable "name" {
 
 variable "display_name" {
   type        = string
-  description = "Nom d'affichage de l'instance (champ purement descriptif dans GCP)."
+  description = "Nom d'affichage de l'instance (purement descriptif)."
   default     = ""
 }
 
@@ -30,45 +29,42 @@ variable "labels" {
   default     = {}
 }
 
-##############################
+########################################
 # Configuration Redis
-##############################
+########################################
 
 variable "tier" {
   type        = string
-  description = "Le service tier de l'instance. Peut être BASIC ou STANDARD_HA."
+  description = "Niveau de service de l'instance: 'BASIC' ou 'STANDARD_HA'."
   default     = "BASIC"
   validation {
     condition     = contains(["BASIC", "STANDARD_HA"], var.tier)
-    error_message = "tier doit être soit 'BASIC' soit 'STANDARD_HA'."
+    error_message = "tier doit être 'BASIC' ou 'STANDARD_HA'."
   }
 }
 
 variable "memory_size_gb" {
   type        = number
-  description = "Taille de la mémoire Redis en Go."
+  description = "Taille de la mémoire Redis, en Go."
   default     = 1
   validation {
     condition     = var.memory_size_gb > 0
-    error_message = "memory_size_gb doit être un nombre entier > 0."
+    error_message = "memory_size_gb doit être > 0."
   }
 }
 
 variable "redis_version" {
   type        = string
   description = <<EOT
-Version de Redis, ex:
-- REDIS_3_2
-- REDIS_4_0
-- REDIS_5_0
-- REDIS_6_X
+Version de Redis supportée par Cloud Memorystore:
+ - REDIS_3_2
+ - REDIS_4_0
+ - REDIS_5_0
+ - REDIS_6_X
 EOT
   default     = "REDIS_6_X"
   validation {
-    condition = contains(
-      ["REDIS_3_2", "REDIS_4_0", "REDIS_5_0", "REDIS_6_X"],
-      var.redis_version
-    )
+    condition = contains(["REDIS_3_2", "REDIS_4_0", "REDIS_5_0", "REDIS_6_X"], var.redis_version)
     error_message = "redis_version doit être parmi REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X."
   }
 }
@@ -76,26 +72,26 @@ EOT
 variable "redis_configs" {
   type        = map(string)
   description = <<EOT
-Ensemble de clés/valeurs pour configurer Redis.
-Ex : {
-  "maxmemory-policy" = "allkeys-lru"
+Configuration Redis supplémentaire, par exemple:
+{
+  "maxmemory-policy"       = "allkeys-lru"
   "notify-keyspace-events" = "KEA"
 }
-Voir la doc GCP pour la liste complète des options supportées.
+Reportez-vous à la doc GCP pour la liste des clés supportées.
 EOT
   default     = {}
 }
 
-##############################
+########################################
 # Réseau et connectivité
-##############################
+########################################
 
 variable "authorized_network" {
   type        = string
   description = <<EOT
-Réseau VPC sur lequel déployer l'instance Redis.
-Peut être l'URL complète (ex : projects/<project_id>/global/networks/<network_name>)
-ou simplement le nom du réseau (selon la version du provider).
+Réseau VPC où déployer Redis.
+Peut être l'URL complète (ex: projects/<project_id>/global/networks/<network_name>)
+ou simplement le nom du réseau, selon le provider.
 EOT
   default = null
 }
@@ -103,16 +99,16 @@ EOT
 variable "reserved_ip_range" {
   type        = string
   description = <<EOT
-Plage IP réservée pour l'instance Redis (CIDR).
-Si non spécifié, GCP en attribue une automatiquement.
+Plage IP (CIDR) réservée pour l'instance Redis.
 Ex: 10.0.0.0/29
+Laisser null pour que GCP en assigne automatiquement.
 EOT
   default = null
 }
 
 variable "connect_mode" {
   type        = string
-  description = "Mode de connexion : DIRECT_PEERING ou PRIVATE_SERVICE_ACCESS."
+  description = "Mode de connexion : 'DIRECT_PEERING' ou 'PRIVATE_SERVICE_ACCESS'."
   default     = "DIRECT_PEERING"
   validation {
     condition     = contains(["DIRECT_PEERING", "PRIVATE_SERVICE_ACCESS"], var.connect_mode)
@@ -122,10 +118,9 @@ variable "connect_mode" {
 
 variable "transit_encryption_mode" {
   type        = string
-  description = "Mode de chiffrement en transit : ENABLED (SERVER_AUTHENTICATION) ou DISABLED."
+  description = "Mode de chiffrement en transit: 'SERVER_AUTHENTICATION' ou 'DISABLED'."
   default     = "DISABLED"
   validation {
-    # Dans la doc GCP, la valeur attendue est "SERVER_AUTHENTICATION" ou "DISABLED".
     condition     = contains(["SERVER_AUTHENTICATION", "DISABLED"], var.transit_encryption_mode)
     error_message = "transit_encryption_mode doit être 'SERVER_AUTHENTICATION' ou 'DISABLED'."
   }
@@ -134,19 +129,19 @@ variable "transit_encryption_mode" {
 variable "auth_enabled" {
   type        = bool
   description = <<EOT
-Activer l'authentification Redis AUTH. Permet de définir un mot de passe pour la connexion.
-Disponible uniquement pour Redis 5.0 et plus.
+Activer ou non l'authentification Redis (AUTH).
+Uniquement dispo pour Redis >= 5.0.
 EOT
   default = false
 }
 
-##############################
+########################################
 # Réplicas (STANDARD_HA)
-##############################
+########################################
 
 variable "read_replicas_mode" {
   type        = string
-  description = "Active ou non les réplicas en lecture : READ_REPLICAS_DISABLED ou READ_REPLICAS_ENABLED."
+  description = "Activer ou non les réplicas en lecture : 'READ_REPLICAS_DISABLED' ou 'READ_REPLICAS_ENABLED'."
   default     = "READ_REPLICAS_DISABLED"
   validation {
     condition     = contains(["READ_REPLICAS_DISABLED", "READ_REPLICAS_ENABLED"], var.read_replicas_mode)
@@ -156,7 +151,7 @@ variable "read_replicas_mode" {
 
 variable "replica_count" {
   type        = number
-  description = "Nombre de réplicas en lecture (uniquement valable si read_replicas_mode = READ_REPLICAS_ENABLED)."
+  description = "Nombre de réplicas en lecture (si read_replicas_mode=READ_REPLICAS_ENABLED)."
   default     = 1
   validation {
     condition     = var.replica_count >= 1
@@ -164,51 +159,57 @@ variable "replica_count" {
   }
 }
 
-##############################
+########################################
 # Maintenance Policy
-##############################
+########################################
+
 variable "maintenance_day" {
   type        = string
   description = <<EOT
-Jour de maintenance planifié (MONDAY, TUESDAY, WEDNESDAY, THURSDAY,
-FRIDAY, SATURDAY, SUNDAY). Si vous ne souhaitez pas configurer,
-laissez à null.
+Jour de maintenance planifiée.
+Doit être l'un de:
+ 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
+ 'FRIDAY', 'SATURDAY', 'SUNDAY'
+ou null pour ne pas définir de fenêtre.
 EOT
   default = null
   validation {
-    condition = var.maintenance_day == null ||
-                contains(
-                  ["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"],
-                  var.maintenance_day
-                )
-    error_message = "maintenance_day doit être l'un des jours valides ou null."
+    condition = var.maintenance_day == null
+             || contains(["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"], var.maintenance_day)
+    error_message = "maintenance_day doit être l'un de (MONDAY..SUNDAY) ou null."
   }
 }
 
 variable "maintenance_start_time" {
   type        = string
   description = <<EOT
-Heure de début de la maintenance planifiée, au format HH:MM en UTC (ex: 03:00).
-Si null, pas de configuration explicite.
+Heure de début de maintenance planifiée, au format HH:MM (UTC).
+Ex : 03:00. Laisser null pour ne pas configurer de fenêtre spécifique.
 EOT
   default = null
   validation {
-    condition = var.maintenance_start_time == null ||
-                can(regex("^[0-1][0-9]:[0-5][0-9]|2[0-3]:[0-5][0-9]$", var.maintenance_start_time))
-    error_message = "maintenance_start_time doit être au format HH:MM (00:00 à 23:59) ou null."
+    condition = var.maintenance_start_time == null
+             || can(
+               regex(
+                 // Heure HH:MM entre 00:00 et 23:59
+                 "^(?:[0-1]\\d|2[0-3]):[0-5]\\d$",
+                 var.maintenance_start_time
+               )
+             )
+    error_message = "maintenance_start_time doit être null ou au format HH:MM (00:00 à 23:59)."
   }
 }
 
-##############################
+########################################
 # Persistence
-##############################
+########################################
 
 variable "persistence_mode" {
   type        = string
   description = <<EOT
-Mode de persistance, ex: DISABLED ou RDB
-- DISABLED : pas de persistance
-- RDB      : snapshots en disque
+Mode de persistance:
+ - DISABLED : pas de persistance
+ - RDB      : snapshots sur disque
 EOT
   default     = "DISABLED"
   validation {
@@ -220,23 +221,35 @@ EOT
 variable "rdb_snapshot_period" {
   type        = string
   description = <<EOT
-Périodicité des snapshots (SECONDS, MINUTES, HOURS, DAYS).
-Uniquement si persistence_mode = RDB.
+Périodicité des snapshots RDB:
+ - ONE_HOUR
+ - SIX_HOURS
+ - TWELVE_HOURS
+ - TWENTY_FOUR_HOURS
+ - MANUAL
 EOT
-  default = null
+  default = "SIX_HOURS"
   validation {
-    condition = var.rdb_snapshot_period == null ||
-                contains(["SECONDS","MINUTES","HOURS","DAYS"], var.rdb_snapshot_period)
-    error_message = "rdb_snapshot_period doit être SECONDS, MINUTES, HOURS, DAYS ou null."
+    condition = contains(
+      ["ONE_HOUR", "SIX_HOURS", "TWELVE_HOURS", "TWENTY_FOUR_HOURS", "MANUAL"],
+      var.rdb_snapshot_period
+    )
+    error_message = "rdb_snapshot_period doit être l'un de ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS ou MANUAL."
   }
 }
 
-variable "rdb_snapshot_interval" {
-  type        = number
-  description = "Intervalle (nombre) pour les snapshots selon le rdb_snapshot_period."
+variable "rdb_snapshot_start_time" {
+  type        = string
+  description = "Heure de début du snapshot RDB, au format HH:MM (UTC). Ex: 03:00"
   default     = null
   validation {
-    condition     = var.rdb_snapshot_interval == null || var.rdb_snapshot_interval > 0
-    error_message = "rdb_snapshot_interval doit être > 0 ou null."
+    condition = var.rdb_snapshot_start_time == null
+             || can(
+               regex(
+                 "^([0-1]\\d|2[0-3]):([0-5]\\d)$",
+                 var.rdb_snapshot_start_time
+               )
+             )
+    error_message = "rdb_snapshot_start_time doit être null ou au format HH:MM (00:00 à 23:59)."
   }
 }

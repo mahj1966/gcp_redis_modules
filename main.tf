@@ -19,10 +19,17 @@ resource "google_redis_instance" "this" {
   read_replicas_mode         = var.read_replicas_mode
   replica_count              = var.replica_count
 
-  // Maintenance policy (uniquement si les variables ne sont pas null)
+  ############################
+  # Maintenance Policy block
+  ############################
   dynamic "maintenance_policy" {
-    for_each = var.maintenance_day != null && var.maintenance_start_time != null ? [1] : []
+    for_each = (
+      var.maintenance_day != null && var.maintenance_start_time != null
+    ) ? [1] : []
+    
     content {
+      # On peut définir plusieurs weekly_maintenance_window
+      # Ici, on ne crée qu'une seule fenêtre si l'utilisateur renseigne un jour et une heure
       weekly_maintenance_window {
         day        = var.maintenance_day
         start_time = var.maintenance_start_time
@@ -30,20 +37,15 @@ resource "google_redis_instance" "this" {
     }
   }
 
-  // Persistence config
+  ############################
+  # Persistence Config block
+  ############################
   dynamic "persistence_config" {
     for_each = var.persistence_mode == "RDB" ? [1] : []
     content {
-      persistence_mode   = var.persistence_mode
-      rdb_snapshot_period   = var.rdb_snapshot_period
-      rdb_snapshot_interval = var.rdb_snapshot_interval
-      # rdb_enabled          = true  // alternative pour versions plus anciennes du provider
+      persistence_mode        = var.persistence_mode
+      rdb_snapshot_period     = var.rdb_snapshot_period
+      rdb_snapshot_start_time = var.rdb_snapshot_start_time
     }
   }
 }
-
-# Si vous utilisez la zone explicitement pour BASIC, vous pouvez ajouter par exemple :
-# resource "google_redis_instance" "this" {
-#   ...
-#   zone = var.zone
-# }
