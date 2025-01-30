@@ -1,5 +1,5 @@
 ########################################
-# Project / Basic Settings
+# Provider / Project Configuration
 ########################################
 
 variable "project_id" {
@@ -30,12 +30,12 @@ variable "labels" {
 }
 
 ########################################
-# Core Redis Configuration
+# Redis Instance Configuration
 ########################################
 
 variable "tier" {
   type        = string
-  description = "Niveau de service de l'instance: 'BASIC' ou 'STANDARD_HA'."
+  description = "Niveau de service: 'BASIC' ou 'STANDARD_HA'."
   default     = "BASIC"
   validation {
     condition     = contains(["BASIC", "STANDARD_HA"], var.tier)
@@ -77,21 +77,20 @@ Configuration Redis supplémentaire. Exemple:
   "maxmemory-policy"       = "allkeys-lru"
   "notify-keyspace-events" = "KEA"
 }
-Reportez-vous à la doc GCP pour la liste des clés supportées.
 EOT
   default     = {}
 }
 
 ########################################
-# Networking
+# Network / Firewall
 ########################################
 
 variable "authorized_network" {
   type        = string
   description = <<EOT
-Réseau VPC où déployer l'instance Redis.  
+Réseau VPC où déployer l'instance Redis.
 Ex: projects/<project_id>/global/networks/<network_name>
-Laisser null pour utiliser le réseau par défaut.
+Laisser null pour le réseau par défaut.
 EOT
   default = null
 }
@@ -128,20 +127,36 @@ variable "transit_encryption_mode" {
 
 variable "auth_enabled" {
   type        = bool
-  description = <<EOT
-Activer ou non l'authentification Redis (AUTH).
-Uniquement dispo pour Redis >= 5.0.
-EOT
-  default = false
+  description = "Activer ou non l'auth Redis (AUTH)."
+  default     = false
+}
+
+# Firewall-like config
+variable "create_firewall" {
+  type        = bool
+  description = "Créer ou non un firewall rule pour autoriser le trafic sur le port Redis (6379)."
+  default     = false
+}
+
+variable "firewall_name" {
+  type        = string
+  description = "Nom de la règle Firewall (si create_firewall = true)."
+  default     = "redis-firewall-rule"
+}
+
+variable "firewall_source_ranges" {
+  type        = list(string)
+  description = "Plages CIDR autorisées à accéder à Redis (port 6379) au sein du réseau."
+  default     = ["10.0.0.0/8"]
 }
 
 ########################################
-# Replicas (for STANDARD_HA)
+# Replicas (STANDARD_HA)
 ########################################
 
 variable "read_replicas_mode" {
   type        = string
-  description = "Activer les réplicas en lecture: 'READ_REPLICAS_DISABLED' ou 'READ_REPLICAS_ENABLED'."
+  description = "Activer ou non les réplicas en lecture: 'READ_REPLICAS_DISABLED' ou 'READ_REPLICAS_ENABLED'."
   default     = "READ_REPLICAS_DISABLED"
   validation {
     condition     = contains(["READ_REPLICAS_DISABLED", "READ_REPLICAS_ENABLED"], var.read_replicas_mode)
@@ -161,20 +176,18 @@ variable "replica_count" {
 
 ########################################
 # Maintenance Policy
-########################################
-# GCP requires a nested `start_time { hours = X, minutes = Y }` block 
-# in weekly_maintenance_window.
+# GCP requires weekly_maintenance_window with day + start_time block
 ########################################
 
 variable "maintenance_day" {
   type        = string
   description = <<EOT
-Jour de maintenance planifiée.
-- L'un de: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
-- null pour ne pas configurer de fenêtre de maintenance.
+Jour de maintenance planifiée:
+ 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
+ 'FRIDAY', 'SATURDAY', 'SUNDAY'
+ou null pour ne pas configurer.
 EOT
   default = null
-
   validation {
     condition = var.maintenance_day == null
              || contains(
@@ -187,9 +200,8 @@ EOT
 
 variable "maintenance_start_hour" {
   type        = number
-  description = "Heure de début de maintenance (0-23)."
+  description = "Heure de début de maintenance (0 à 23)."
   default     = 3
-
   validation {
     condition     = var.maintenance_start_hour >= 0 && var.maintenance_start_hour <= 23
     error_message = "maintenance_start_hour doit être entre 0 et 23."
@@ -198,9 +210,8 @@ variable "maintenance_start_hour" {
 
 variable "maintenance_start_minute" {
   type        = number
-  description = "Minute de début de maintenance (0-59)."
+  description = "Minute de début de maintenance (0 à 59)."
   default     = 0
-
   validation {
     condition     = var.maintenance_start_minute >= 0 && var.maintenance_start_minute <= 59
     error_message = "maintenance_start_minute doit être entre 0 et 59."
@@ -208,7 +219,7 @@ variable "maintenance_start_minute" {
 }
 
 ########################################
-# Persistence (RDB snapshots)
+# Persistence (RDB Snapshots)
 ########################################
 
 variable "persistence_mode" {
@@ -241,20 +252,20 @@ EOT
       ["ONE_HOUR", "SIX_HOURS", "TWELVE_HOURS", "TWENTY_FOUR_HOURS", "MANUAL"],
       var.rdb_snapshot_period
     )
-    error_message = "rdb_snapshot_period doit être ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS ou MANUAL."
+    error_message = "rdb_snapshot_period doit être: ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS, ou MANUAL."
   }
 }
 
-variable "rdb_snapshot_start_time" {
-  type        = string
-  description = "Heure de début du snapshot RDB, au format HH:MM (UTC). Ex: 03:00 (ou null)."
-  default     = null
+########################################
+# CMEK (Customer Managed Encryption Key)
+########################################
 
-  validation {
-    condition = var.rdb_snapshot_start_time == null
-             || can(
-               regex("^([0-1]\\d|2[0-3]):([0-5]\\d)$", var.rdb_snapshot_start_time)
-             )
-    error_message = "rdb_snapshot_start_time doit être null ou au format HH:MM (00:00 à 23:59)."
-  }
+variable "kms_key_name" {
+  type        = string
+  description = <<EOT
+Nom complet de la clé KMS pour la gestion du chiffrement à
+rest (ex: projects/<project_id>/locations/<location>/keyRings/<ring>/cryptoKeys/<key>).
+Laisser null pour utiliser l'encryption par défaut GCP.
+EOT
+  default = null
 }
