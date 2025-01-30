@@ -1,53 +1,52 @@
 provider "google" {
-  project = "my-gcp-project-id"
+  project = "my-project-id"
   region  = "us-central1"
-  # credentials = file("path/to/serviceAccountKey.json")
+  # credentials = file("path/to/service-account.json") # if needed
 }
 
-# For CMEK or advanced features, you might need google-beta:
-# provider "google-beta" {
-#   project = "my-gcp-project-id"
-#   region  = "us-central1"
-#   # credentials = file("path/to/serviceAccountKey.json")
-# }
-
-module "my_redis" {
+module "redis_instance" {
   source = "./modules/redis"
 
-  project_id = "my-gcp-project-id"
-  region     = "us-central1"
-  name       = "my-redis-prod"
+  project_id    = "my-project-id"
+  region        = "us-central1"
+  name          = "my-redis-prod"
+  display_name  = "Production Redis"
+  tier          = "STANDARD_HA"
+  memory_size_gb = 2
+  redis_version  = "REDIS_6_X"
 
-  tier            = "STANDARD_HA"
-  memory_size_gb  = 2
-  redis_version   = "REDIS_6_X"
-  auth_enabled    = true
+  auth_enabled            = true
+  connect_mode            = "DIRECT_PEERING"
+  transit_encryption_mode = "SERVER_AUTHENTICATION"
 
-  # VPC
-  authorized_network = "projects/my-gcp-project-id/global/networks/my-vpc"
-  connect_mode       = "DIRECT_PEERING"
+  authorized_network = "projects/my-project-id/global/networks/custom-vpc"
+  reserved_ip_range  = "10.10.1.0/29"
 
-  # Maintenance window: Tuesday 03:00
   maintenance_day         = "TUESDAY"
-  maintenance_start_hour  = 3
-  maintenance_start_minute= 0
+  maintenance_start_hour  = 2
+  maintenance_start_minute= 15
 
-  # RDB Persistence, every 6 hours
   persistence_mode    = "RDB"
   rdb_snapshot_period = "SIX_HOURS"
 
-  # CMEK (optional)
-  kms_key_name = "projects/my-gcp-project-id/locations/us/keyRings/my-ring/cryptoKeys/my-redis-key"
+  # Optional: create an internal firewall rule
+  create_firewall        = true
+  firewall_name          = "redis-6379-firewall"
+  firewall_source_ranges = ["10.128.0.0/16"]
 
-  # Firewall for port 6379
-  create_firewall          = true
-  firewall_name            = "my-redis-firewall"
-  firewall_source_ranges    = ["10.0.0.0/8","192.168.0.0/16"]
+  # CMEK example:
+  # kms_key_name = "projects/my-project-id/locations/us/keyRings/my-ring/cryptoKeys/my-redis-key"
+
+  # Additional Redis config
+  redis_configs = {
+    "maxmemory-policy" = "allkeys-lru"
+  }
 }
 
 output "redis_host" {
-  value = module.my_redis.redis_host
+  value = module.redis_instance.host
 }
+
 output "redis_port" {
-  value = module.my_redis.redis_port
+  value = module.redis_instance.port
 }

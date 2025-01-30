@@ -1,24 +1,24 @@
-output "redis_instance_id" {
-  description = "L'ID de la ressource Redis."
+output "id" {
+  description = "The resource ID of the Redis instance."
   value       = google_redis_instance.this.id
 }
 
-output "redis_host" {
-  description = "Adresse IP de l'instance Redis."
+output "host" {
+  description = "The private IP address of the Redis instance."
   value       = google_redis_instance.this.host
 }
 
-output "redis_port" {
-  description = "Port sur lequel Redis est accessible."
+output "port" {
+  description = "The port on which Redis is listening."
   value       = google_redis_instance.this.port
 }
 
-output "redis_read_endpoint" {
-  description = "Adresse du endpoint en lecture (si read_replicas_mode=READ_REPLICAS_ENABLED)."
+output "read_endpoint" {
+  description = "The IP address for read endpoint (if read replicas enabled)."
   value       = google_redis_instance.this.read_endpoint
 }
 
-output "redis_read_endpoint_port" {
-  description = "Port du endpoint en lecture."
+output "read_endpoint_port" {
+  description = "The port for read endpoint (if read replicas enabled)."
   value       = google_redis_instance.this.read_endpoint_port
 }

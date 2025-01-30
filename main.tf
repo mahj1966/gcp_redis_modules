@@ -1,10 +1,9 @@
-########################################
+#########################################################
 # Redis instance
-########################################
+#########################################################
 resource "google_redis_instance" "this" {
-  # Might require:
+  # Possibly require provider = google-beta if you need beta features
   # provider = google-beta
-  # if you're using the beta feature for CMEK
 
   name            = var.name
   project         = var.project_id
@@ -25,9 +24,9 @@ resource "google_redis_instance" "this" {
   read_replicas_mode     = var.read_replicas_mode
   replica_count          = var.replica_count
 
-  ############################
-  # Maintenance Policy
-  ############################
+  #######################################################
+  # Maintenance policy
+  #######################################################
   dynamic "maintenance_policy" {
     for_each = var.maintenance_day != null ? [1] : []
     content {
@@ -42,22 +41,21 @@ resource "google_redis_instance" "this" {
     }
   }
 
-  ############################
-  # Persistence (RDB Snapshots)
-  ############################
+  #######################################################
+  # Persistence config (RDB Snapshots)
+  #######################################################
   dynamic "persistence_config" {
     for_each = var.persistence_mode == "RDB" ? [1] : []
     content {
       persistence_mode    = var.persistence_mode
       rdb_snapshot_period = var.rdb_snapshot_period
-      # rdb_snapshot_start_time is often read-only or not recommended
-      # unless your provider version explicitly supports setting it in RFC3339.
+      # rdb_snapshot_start_time is often read-only or requires RFC3339 if available
     }
   }
 
-  ############################
-  # Encryption at Rest (CMEK)
-  ############################
+  #######################################################
+  # Customer-managed encryption (CMEK)
+  #######################################################
   dynamic "customer_managed_key" {
     for_each = var.kms_key_name == null ? [] : [var.kms_key_name]
     content {
@@ -66,11 +64,10 @@ resource "google_redis_instance" "this" {
   }
 }
 
-########################################
-# Firewall rule (like a security group)
-########################################
+#########################################################
+# Firewall rule (optional)
+#########################################################
 resource "google_compute_firewall" "redis_firewall" {
-  # This resource is only created if create_firewall = true
   count = var.create_firewall ? 1 : 0
 
   name    = var.firewall_name
@@ -83,9 +80,7 @@ resource "google_compute_firewall" "redis_firewall" {
   }
 
   source_ranges = var.firewall_source_ranges
-
-  # Optionally label your firewall rule
-  # labels = {
-  #   "component" = "redis-firewall"
-  # }
+  # Example extra fields, if desired:
+  # target_tags = ["redis-access"]
+  # direction   = "INGRESS"
 }

@@ -1,96 +1,98 @@
-########################################
-# Provider / Project Configuration
-########################################
+#########################################################
+# Project / Basic settings
+#########################################################
 
 variable "project_id" {
   type        = string
-  description = "ID du projet GCP où créer l'instance Redis."
+  description = "The ID of the GCP project in which to create the Redis instance."
 }
 
 variable "region" {
   type        = string
-  description = "Région GCP pour l'instance Redis (ex: us-central1)."
+  description = "The GCP region for the Redis instance (e.g., us-central1)."
 }
 
 variable "name" {
   type        = string
-  description = "Nom unique de l'instance Redis."
+  description = "A unique name for the Redis instance."
 }
 
 variable "display_name" {
   type        = string
-  description = "Nom d'affichage de l'instance (purement descriptif)."
+  description = "An optional display name for the Redis instance."
   default     = ""
 }
 
 variable "labels" {
   type        = map(string)
-  description = "Labels à appliquer à l'instance Redis."
+  description = "A set of key/value label pairs to assign to the Redis instance."
   default     = {}
 }
 
-########################################
-# Redis Instance Configuration
-########################################
+#########################################################
+# Redis core configuration
+#########################################################
 
 variable "tier" {
   type        = string
-  description = "Niveau de service: 'BASIC' ou 'STANDARD_HA'."
+  description = "Service tier: BASIC or STANDARD_HA."
   default     = "BASIC"
   validation {
     condition     = contains(["BASIC", "STANDARD_HA"], var.tier)
-    error_message = "tier doit être 'BASIC' ou 'STANDARD_HA'."
+    error_message = "tier must be BASIC or STANDARD_HA."
   }
 }
 
 variable "memory_size_gb" {
   type        = number
-  description = "Taille de la mémoire Redis, en Go."
+  description = "Memory size in GB for the Redis instance."
   default     = 1
   validation {
     condition     = var.memory_size_gb > 0
-    error_message = "memory_size_gb doit être > 0."
+    error_message = "memory_size_gb must be > 0."
   }
 }
 
 variable "redis_version" {
   type        = string
   description = <<EOT
-Version Redis supportée par Cloud Memorystore:
- - REDIS_3_2
- - REDIS_4_0
- - REDIS_5_0
- - REDIS_6_X
+Version of Redis supported by Cloud Memorystore:
+- REDIS_3_2
+- REDIS_4_0
+- REDIS_5_0
+- REDIS_6_X
 EOT
   default     = "REDIS_6_X"
   validation {
     condition = contains(["REDIS_3_2", "REDIS_4_0", "REDIS_5_0", "REDIS_6_X"], var.redis_version)
-    error_message = "redis_version doit être REDIS_3_2, REDIS_4_0, REDIS_5_0 ou REDIS_6_X."
+    error_message = "redis_version must be one of REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X."
   }
 }
 
 variable "redis_configs" {
   type        = map(string)
   description = <<EOT
-Configuration Redis supplémentaire. Exemple:
+Additional Redis configuration parameters, e.g.:
 {
   "maxmemory-policy"       = "allkeys-lru"
   "notify-keyspace-events" = "KEA"
 }
+Refer to GCP docs for the full list of supported configs.
 EOT
   default     = {}
 }
 
-########################################
-# Network / Firewall
-########################################
+#########################################################
+# Networking
+#########################################################
 
 variable "authorized_network" {
   type        = string
   description = <<EOT
-Réseau VPC où déployer l'instance Redis.
-Ex: projects/<project_id>/global/networks/<network_name>
-Laisser null pour le réseau par défaut.
+The VPC network in which to create the Redis instance.
+Full resource path (e.g. projects/<proj>/global/networks/<network>)
+or just the network name if using a recent provider.
+Set to null to use the default network (not recommended for prod).
 EOT
   default = null
 }
@@ -98,94 +100,94 @@ EOT
 variable "reserved_ip_range" {
   type        = string
   description = <<EOT
-Plage IP (CIDR) réservée pour l'instance Redis.
-Ex: 10.0.0.0/29
-Laisser null pour que GCP en assigne automatiquement.
+A CIDR range (e.g., 10.0.0.0/29) for the Redis instance. If null, GCP
+will automatically choose a range.
 EOT
   default = null
 }
 
 variable "connect_mode" {
   type        = string
-  description = "Mode de connexion : 'DIRECT_PEERING' ou 'PRIVATE_SERVICE_ACCESS'."
+  description = "Connection mode: DIRECT_PEERING or PRIVATE_SERVICE_ACCESS."
   default     = "DIRECT_PEERING"
   validation {
     condition     = contains(["DIRECT_PEERING", "PRIVATE_SERVICE_ACCESS"], var.connect_mode)
-    error_message = "connect_mode doit être 'DIRECT_PEERING' ou 'PRIVATE_SERVICE_ACCESS'."
+    error_message = "connect_mode must be DIRECT_PEERING or PRIVATE_SERVICE_ACCESS."
   }
 }
 
 variable "transit_encryption_mode" {
   type        = string
-  description = "Mode de chiffrement en transit: 'SERVER_AUTHENTICATION' ou 'DISABLED'."
+  description = "Transit encryption mode: DISABLED or SERVER_AUTHENTICATION (TLS)."
   default     = "DISABLED"
   validation {
-    condition     = contains(["SERVER_AUTHENTICATION", "DISABLED"], var.transit_encryption_mode)
-    error_message = "transit_encryption_mode doit être 'SERVER_AUTHENTICATION' ou 'DISABLED'."
+    condition     = contains(["DISABLED", "SERVER_AUTHENTICATION"], var.transit_encryption_mode)
+    error_message = "transit_encryption_mode must be DISABLED or SERVER_AUTHENTICATION."
   }
 }
 
 variable "auth_enabled" {
   type        = bool
-  description = "Activer ou non l'auth Redis (AUTH)."
+  description = "Whether to enable Redis AUTH (password) - requires Redis >= 5.0."
   default     = false
 }
 
-# Firewall-like config
+#########################################################
+# Firewall (like a security group)
+#########################################################
+
 variable "create_firewall" {
   type        = bool
-  description = "Créer ou non un firewall rule pour autoriser le trafic sur le port Redis (6379)."
+  description = "If true, creates a firewall rule to allow traffic on port 6379."
   default     = false
 }
 
 variable "firewall_name" {
   type        = string
-  description = "Nom de la règle Firewall (si create_firewall = true)."
+  description = "Name of the firewall rule if create_firewall = true."
   default     = "redis-firewall-rule"
 }
 
 variable "firewall_source_ranges" {
   type        = list(string)
-  description = "Plages CIDR autorisées à accéder à Redis (port 6379) au sein du réseau."
+  description = "CIDR source ranges allowed to connect to Redis on port 6379."
   default     = ["10.0.0.0/8"]
 }
 
-########################################
-# Replicas (STANDARD_HA)
-########################################
+#########################################################
+# Read replicas (STANDARD_HA)
+#########################################################
 
 variable "read_replicas_mode" {
   type        = string
-  description = "Activer ou non les réplicas en lecture: 'READ_REPLICAS_DISABLED' ou 'READ_REPLICAS_ENABLED'."
+  description = "READ_REPLICAS_DISABLED or READ_REPLICAS_ENABLED (STANDARD_HA only)."
   default     = "READ_REPLICAS_DISABLED"
   validation {
     condition     = contains(["READ_REPLICAS_DISABLED", "READ_REPLICAS_ENABLED"], var.read_replicas_mode)
-    error_message = "read_replicas_mode doit être 'READ_REPLICAS_DISABLED' ou 'READ_REPLICAS_ENABLED'."
+    error_message = "read_replicas_mode must be READ_REPLICAS_DISABLED or READ_REPLICAS_ENABLED."
   }
 }
 
 variable "replica_count" {
   type        = number
-  description = "Nombre de réplicas en lecture (si read_replicas_mode=READ_REPLICAS_ENABLED)."
+  description = "Number of read replicas (when read_replicas_mode=READ_REPLICAS_ENABLED)."
   default     = 1
   validation {
     condition     = var.replica_count >= 1
-    error_message = "replica_count doit être >= 1."
+    error_message = "replica_count must be >= 1."
   }
 }
 
-########################################
-# Maintenance Policy
-# GCP requires weekly_maintenance_window with day + start_time block
-########################################
+#########################################################
+# Maintenance policy
+#########################################################
 
 variable "maintenance_day" {
   type        = string
   description = <<EOT
-Jour de maintenance planifiée:
- 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
- 'FRIDAY', 'SATURDAY', 'SUNDAY'
-ou null pour ne pas configurer.
+Day of the week for maintenance:
+- MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
+Set to null if you don't want to define a specific window.
 EOT
   default = null
   validation {
@@ -194,57 +196,53 @@ EOT
                   ["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"],
                   var.maintenance_day
                 )
-    error_message = "maintenance_day doit être MONDAY..SUNDAY ou null."
+    error_message = "maintenance_day must be MONDAY..SUNDAY or null."
   }
 }
 
 variable "maintenance_start_hour" {
   type        = number
-  description = "Heure de début de maintenance (0 à 23)."
+  description = "Hour (0-23) for the maintenance window start time (UTC)."
   default     = 3
   validation {
     condition     = var.maintenance_start_hour >= 0 && var.maintenance_start_hour <= 23
-    error_message = "maintenance_start_hour doit être entre 0 et 23."
+    error_message = "maintenance_start_hour must be between 0 and 23."
   }
 }
 
 variable "maintenance_start_minute" {
   type        = number
-  description = "Minute de début de maintenance (0 à 59)."
+  description = "Minute (0-59) for the maintenance window start time (UTC)."
   default     = 0
   validation {
     condition     = var.maintenance_start_minute >= 0 && var.maintenance_start_minute <= 59
-    error_message = "maintenance_start_minute doit être entre 0 et 59."
+    error_message = "maintenance_start_minute must be between 0 and 59."
   }
 }
 
-########################################
+#########################################################
 # Persistence (RDB Snapshots)
-########################################
+#########################################################
 
 variable "persistence_mode" {
   type        = string
-  description = <<EOT
-Mode de persistance:
- - DISABLED : aucune persistance
- - RDB      : snapshots sur disque
-EOT
-  default = "DISABLED"
+  description = "Persistence mode: DISABLED or RDB."
+  default     = "DISABLED"
   validation {
     condition     = contains(["DISABLED", "RDB"], var.persistence_mode)
-    error_message = "persistence_mode doit être 'DISABLED' ou 'RDB'."
+    error_message = "persistence_mode must be DISABLED or RDB."
   }
 }
 
 variable "rdb_snapshot_period" {
   type        = string
   description = <<EOT
-Périodicité des snapshots RDB:
- - ONE_HOUR
- - SIX_HOURS
- - TWELVE_HOURS
- - TWENTY_FOUR_HOURS
- - MANUAL
+RDB snapshot period:
+- ONE_HOUR
+- SIX_HOURS
+- TWELVE_HOURS
+- TWENTY_FOUR_HOURS
+- MANUAL
 EOT
   default = "SIX_HOURS"
   validation {
@@ -252,20 +250,20 @@ EOT
       ["ONE_HOUR", "SIX_HOURS", "TWELVE_HOURS", "TWENTY_FOUR_HOURS", "MANUAL"],
       var.rdb_snapshot_period
     )
-    error_message = "rdb_snapshot_period doit être: ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS, ou MANUAL."
+    error_message = "rdb_snapshot_period must be ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS, or MANUAL."
   }
 }
 
-########################################
+#########################################################
 # CMEK (Customer Managed Encryption Key)
-########################################
+#########################################################
 
 variable "kms_key_name" {
   type        = string
   description = <<EOT
-Nom complet de la clé KMS pour la gestion du chiffrement à
-rest (ex: projects/<project_id>/locations/<location>/keyRings/<ring>/cryptoKeys/<key>).
-Laisser null pour utiliser l'encryption par défaut GCP.
+Fully qualified KMS key name, e.g.:
+projects/<project>/locations/<location>/keyRings/<ring>/cryptoKeys/<key>
+If null, uses Google-managed encryption (DEK).
 EOT
   default = null
 }
