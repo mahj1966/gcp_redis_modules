@@ -1,191 +1,207 @@
-# gcp_redis_modules
-Voici un exemple de documentation complète (à la fois technique et conceptuelle) pour votre module Terraform Cloud Memorystore (Redis) sur GCP. Vous pouvez l’adapter à vos besoins, l’enrichir ou le publier dans un wiki interne.
-Documentation du Module Terraform GCP Redis (Cloud Memorystore)
-Table des Matières
+# Terraform GCP Redis (Cloud Memorystore) Module Documentation
 
-    Introduction
-    Objectifs et Fonctionnalités
-    Architecture et Concepts Clés
-    Prérequis et Configuration
-    Variables et Paramètres
-    Maintenance, Persistance, Sécurité et Encryption
-    Exemple d’Utilisation
-    Bonnes Pratiques et Recommandations
-    Dépannage (Troubleshooting)
-    Références
+## Table of Contents
+1. [Introduction](#introduction)  
+2. [Objectives & Features](#objectives--features)  
+3. [Architecture & Key Concepts](#architecture--key-concepts)  
+4. [Prerequisites & Setup](#prerequisites--setup)  
+5. [Variables & Configuration](#variables--configuration)  
+6. [Maintenance, Persistence, Security, & Encryption](#maintenance-persistence-security--encryption)  
+7. [Example Usage](#example-usage)  
+8. [Best Practices & Recommendations](#best-practices--recommendations)  
+9. [Troubleshooting](#troubleshooting)  
+10. [References](#references)
 
-1. Introduction
+---
 
-Ce module Terraform permet de déployer et de configurer automatiquement un service Cloud Memorystore for Redis sur Google Cloud Platform (GCP). Il gère :
+## Introduction
 
-    La création et la configuration de l’instance Redis (tier BASIC ou STANDARD_HA).
-    L’activation de la persistance (RDB Snapshots), si nécessaire.
-    La configuration de la fenêtre de maintenance.
-    La gestion des accès réseau (VPC, firewall interne).
-    La configuration optionnelle d’une clé KMS pour le chiffrement des données au repos (CMEK).
+This Terraform module automates the deployment and configuration of **Cloud Memorystore for Redis** on **Google Cloud Platform (GCP)**. It manages:
 
-Grâce à ce module, vous pouvez automatiser la mise en place de Redis de manière reproductible, évolutive et sécurisée.
-2. Objectifs et Fonctionnalités
+- The creation and configuration of the Redis instance (BASIC or STANDARD_HA tier).  
+- Enabling persistence (RDB Snapshots) if needed.  
+- Maintenance window configuration.  
+- Network access (VPC, optional firewall rule).  
+- Optionally, a **KMS key** for at-rest encryption (CMEK).
 
-    Création d’une instance Redis :
-        Tier BASIC (instance unique) ou STANDARD_HA (haute disponibilité).
-        Choix de la mémoire, de la version Redis, de la configuration interne (redis_configs).
+By using this module, you can **consistently**, **scalably**, and **securely** provision Redis on GCP.
 
-    Réseau et connectivité :
-        Possibilité de spécifier un VPC dédié (authorized_network).
-        Choix du mode de connectivité (DIRECT_PEERING ou PRIVATE_SERVICE_ACCESS).
-        Configuration optionnelle d’une règle firewall pour le trafic Redis (port 6379).
+---
 
-    Maintenance et patching :
-        Définition d’une fenêtre de maintenance hebdomadaire (jour + heure/minute).
+## Objectives & Features
 
-    Persistance (RDB Snapshots) :
-        Désactivée par défaut ou déclenchée à intervalles réguliers (1 heure, 6 heures, etc.).
+- **Create a Redis Instance**  
+  - Choose between BASIC (single instance) or STANDARD_HA (high availability).  
+  - Specify memory size, Redis version, and additional Redis configs.
 
-    Sécurité :
-        Encryption in transit avec SERVER_AUTHENTICATION ou DISABLED.
-        Encryption at rest :
-            Par défaut, Google-managed encryption (DEK).
-            Optionnellement, CMEK (Customer-Managed Encryption Key) via Cloud KMS.
+- **Network & Connectivity**  
+  - Optionally specify a custom VPC (`authorized_network`).  
+  - Choose connect mode: `DIRECT_PEERING` or `PRIVATE_SERVICE_ACCESS`.  
+  - Optionally configure a firewall rule to allow Redis traffic on port 6379.
 
-    Réplicas en lecture (uniquement en STANDARD_HA) :
-        Activation possible via read_replicas_mode et replica_count.
+- **Maintenance & Patching**  
+  - Define a weekly maintenance window (day + hour/minute).
 
-3. Architecture et Concepts Clés
-3.1. Architecture Générale
+- **Persistence (RDB)**  
+  - Disabled by default or enabled with periodic snapshots (1 hour, 6 hours, etc.).  
+  - GCP manages snapshots automatically.
 
-    Module Terraform :
-        Déploie un google_redis_instance sur GCP.
-        Optionnellement, crée une ressource google_compute_firewall pour autoriser le trafic interne sur le port 6379.
+- **Security**  
+  - **Encryption in transit**: `SERVER_AUTHENTICATION` (TLS) or `DISABLED`.  
+  - **Encryption at rest**:
+    - By default, Google-managed encryption (DEK).  
+    - Optionally, CMEK (Customer-Managed Encryption Key) through Cloud KMS.
 
-    VPC :
-        L’instance Redis réside dans un réseau VPC privé (autorisé par authorized_network).
-        Pas d’accès public : la connexion se fait depuis des machines ou services au sein du même VPC ou via peering.
+- **Read Replicas** (for STANDARD_HA)  
+  - Enable read replicas via `read_replicas_mode` and `replica_count`.
 
-    Maintenance Policy :
-        GCP applique automatiquement ses mises à jour ou patches lors de la fenêtre définie (jour et heure).
+---
 
-    Persistance RDB :
-        Les snapshots sont sauvegardés selon une périodicité définie (1h, 6h, etc.).
-        Les données sont stockées sur l’infrastructure Google (avec un chiffrement par défaut ou CMEK).
+## Architecture & Key Concepts
 
-3.2. Concepts Clés
+### 3.1 General Architecture
 
-    Tier BASIC vs STANDARD_HA :
-        BASIC : instance unique sans haute disponibilité.
-        STANDARD_HA : réplique en mode failover automatique, plus robuste, surtout en production.
+1. **Terraform Module**  
+   - Deploys a `google_redis_instance` resource on GCP.  
+   - Optionally creates a `google_compute_firewall` resource to allow internal traffic on port 6379.
 
-    Encryption in Transit :
-        SERVER_AUTHENTICATION : active le chiffrement TLS lors de la connexion (clients doivent supporter TLS).
-        DISABLED : pas de chiffrement en transit (intraflot VPC protégé par défaut).
+2. **VPC**  
+   - The Redis instance lives on a private IP within the specified VPC.  
+   - No public IP access: any connections must happen from the same or peered VPC.
 
-    Chiffrement au Repos (At Rest) :
-        DEK par défaut (Google-managed).
-        CMEK (Customer-Managed Encryption Key) : clé KMS gérée par l’utilisateur, offrant plus de contrôle (révocation, rotation).
+3. **Maintenance Policy**  
+   - GCP automatically applies updates/patches within the defined maintenance window.
 
-    Firewall :
-        Contrôle l’accès réseau sur le port 6379.
-        Fonctionne comme un “security group” en environnement GCP (règle google_compute_firewall).
+4. **RDB Persistence**  
+   - Snapshots are stored on Google infrastructure.  
+   - Configurable frequency (1 hour, 6 hours, etc.).
 
-4. Prérequis et Configuration
+### 3.2 Key Concepts
 
-    Comptes et rôles GCP :
-        Avoir un projet GCP actif.
-        Disposer des rôles nécessaires (ex: roles/redis.admin, roles/compute.networkAdmin, roles/compute.securityAdmin, etc.).
+- **BASIC vs STANDARD_HA**  
+  - BASIC: single node, no high availability.  
+  - STANDARD_HA: automatic failover with higher resiliency.
 
-    Terraform :
-        Avoir Terraform version 1.x (de préférence >= 1.3).
-        Installer le Provider Google : terraform init gérera ce point automatiquement.
+- **Encryption in Transit**  
+  - `SERVER_AUTHENTICATION` for TLS, `DISABLED` otherwise.
 
-    API GCP :
-        Activer l’API Cloud Memorystore for Redis : gcloud services enable redis.googleapis.com.
-        Si firewall activé : s’assurer que l’API compute.googleapis.com est également activée.
+- **Encryption at Rest**  
+  - **Default**: Google-managed encryption key (DEK).  
+  - **CMEK**: user-managed key via Cloud KMS (rotate/revoke at your control).
 
-    Service Account (optionnel) :
-        Si vous utilisez un compte de service et un fichier de clés JSON, préciser le chemin dans credentials.
-        Le service account doit avoir les permissions pour créer/modifier des instances Redis, VPC, etc.
+- **Firewall**  
+  - Controlled via `google_compute_firewall`.  
+  - Restricts inbound connections to specific source IP ranges.
 
-    Pour CMEK (facultatif) :
-        Créer une clé KMS dans un key ring (ex: projects/<proj>/locations/<region>/keyRings/<ring>/cryptoKeys/<key>).
-        Accorder l’accès roles/cloudkms.cryptoKeyEncrypterDecrypter au service account Redis (souvent service-<PROJECT_NUMBER>@cloud-redis.iam.gserviceaccount.com, ou le compte par défaut du projet).
+---
 
-5. Variables et Paramètres
+## Prerequisites & Setup
 
-Vous trouverez ci-dessous une vue d’ensemble des variables principales (cf. variables.tf complet dans le module) :
-Variable	Type	Par défaut	Description
-project_id	string	- (obligatoire)	ID du projet GCP
-region	string	- (obligatoire)	Région GCP (ex: us-central1)
-name	string	- (obligatoire)	Nom unique de l’instance Redis
-tier	string	"BASIC"	Niveau de service (BASIC ou STANDARD_HA)
-memory_size_gb	number	1	Taille mémoire en Go
-redis_version	string	"REDIS_6_X"	Version Redis (ex: REDIS_5_0)
-redis_configs	map(string)	{}	Clés/valeurs de configuration Redis
-authorized_network	string | null	null	Réseau VPC (ex: projects/myproj/global/networks/default)
-reserved_ip_range	string | null	null	CIDR réservé (ex: 10.0.0.0/29)
-connect_mode	string	"DIRECT_PEERING"	DIRECT_PEERING ou PRIVATE_SERVICE_ACCESS
-transit_encryption_mode	string	"DISABLED"	SERVER_AUTHENTICATION ou DISABLED
-auth_enabled	bool	false	Active l’auth Redis (>=5.0)
-read_replicas_mode	string	"READ_REPLICAS_DISABLED"	Active les réplicas en lecture si READ_REPLICAS_ENABLED (uniquement en STANDARD_HA)
-replica_count	number	1	Nombre de réplicas en lecture
-maintenance_day	string | null	null	Jour de maintenance (ex: TUESDAY)
-maintenance_start_hour	number	3	Heure (0-23)
-maintenance_start_minute	number	0	Minute (0-59)
-persistence_mode	string	"DISABLED"	DISABLED ou RDB
-rdb_snapshot_period	string	"SIX_HOURS"	ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS, MANUAL
-kms_key_name	string | null	null	Nom complet de la clé KMS pour CMEK (sinon DEK Google-managed)
-create_firewall	bool	false	Créer une règle firewall interne pour autoriser le port 6379
-firewall_name	string	"redis-firewall-rule"	Nom de la règle firewall
-firewall_source_ranges	list(string)	["10.0.0.0/8"]	Plages IP autorisées
-6. Maintenance, Persistance, Sécurité et Encryption
-6.1. Maintenance Policy
+1. **GCP Accounts & Roles**  
+   - You need an active GCP project.  
+   - IAM roles such as `roles/redis.admin`, `roles/compute.networkAdmin`, and `roles/compute.securityAdmin` may be required.
 
-    Maintenance_day : vous pouvez définir un jour de la semaine (ex: MONDAY).
-    maintenance_start_hour / _minute : contrôlent l’heure UTC de début de la maintenance.
-    Si maintenance_day est null, aucune fenêtre de maintenance n’est créée (GCP choisira la sienne).
+2. **Terraform**  
+   - Use Terraform **1.x** (preferably 1.3+).  
+   - A recent **Google provider** version.
 
-6.2. Persistance (RDB Snapshots)
+3. **Enable GCP APIs**  
+   - `redis.googleapis.com` for Cloud Memorystore.  
+   - `compute.googleapis.com` for firewall (if needed).
 
-    persistence_mode = "DISABLED" ou "RDB".
-    rdb_snapshot_period : cadence des snapshots (1h, 6h, 12h, etc.).
-    GCP gère automatiquement les snapshots, qui sont stockés sur l’infrastructure Google.
+4. **Service Account (optional)**  
+   - If using a service account JSON key, specify `credentials = file("path/to/key.json")`.  
+   - Ensure it has permissions to manage Redis, VPC, etc.
 
-6.3. Sécurité / Encryption
+5. **For CMEK** (optional)  
+   - Create a KMS key in the required region.  
+   - Grant `roles/cloudkms.cryptoKeyEncrypterDecrypter` to the Cloud Memorystore service account.
 
-    Encryption in transit :
-        DISABLED : pas de TLS.
-        SERVER_AUTHENTICATION : TLS activé, les clients doivent supporter TLS.
+---
 
-    Encryption at rest :
-        Par défaut : Google Data Encryption Key (DEK), géré automatiquement par Google.
-        CMEK : via kms_key_name. Dans ce cas, vous devez avoir les droits KMS appropriés et la localisation compatible avec l’instance.
+## Variables & Configuration
 
-6.4. Firewall
+Below is an overview of main variables (see the module’s `variables.tf` for full details):
 
-    Pour restreindre l’accès au port Redis (6379), vous pouvez créer une ressource google_compute_firewall.
-    Les IP sources autorisées doivent être dans firewall_source_ranges.
-    N’oubliez pas de lier la règle au même network (VPC) que l’instance Redis.
+| Variable                   | Type             | Default             | Description                                                                                                                                         |
+|---------------------------|------------------|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `project_id`              | `string`         | - (required)        | GCP project ID                                                                                                                                      |
+| `region`                  | `string`         | - (required)        | GCP region (e.g., `us-central1`)                                                                                                                    |
+| `name`                    | `string`         | - (required)        | Unique Redis instance name                                                                                                                          |
+| `tier`                    | `string`         | `"BASIC"`           | `BASIC` or `STANDARD_HA`                                                                                                                            |
+| `memory_size_gb`          | `number`         | `1`                 | Memory size in GB                                                                                                                                   |
+| `redis_version`           | `string`         | `"REDIS_6_X"`       | Redis version (e.g., `REDIS_5_0`)                                                                                                                   |
+| `redis_configs`           | `map(string)`    | `{}`                | Additional Redis configs (key-value pairs)                                                                                                          |
+| `authorized_network`      | `string \| null` | `null`              | VPC network (e.g., `projects/<proj>/global/networks/<name>`)                                                                                       |
+| `reserved_ip_range`       | `string \| null` | `null`              | Reserved IP range (CIDR), e.g., `10.0.0.0/29`                                                                                                        |
+| `connect_mode`            | `string`         | `"DIRECT_PEERING"`  | `DIRECT_PEERING` or `PRIVATE_SERVICE_ACCESS`                                                                                                        |
+| `transit_encryption_mode` | `string`         | `"DISABLED"`        | `SERVER_AUTHENTICATION` (TLS) or `DISABLED`                                                                                                         |
+| `auth_enabled`            | `bool`           | `false`             | Enable Redis AUTH (for Redis >=5.0)                                                                                                                 |
+| `read_replicas_mode`      | `string`         | `"READ_REPLICAS_DISABLED"` | Enable read replicas if set to `READ_REPLICAS_ENABLED` (only in STANDARD_HA)                                                                  |
+| `replica_count`           | `number`         | `1`                 | Number of read replicas                                                                                                                             |
+| `maintenance_day`         | `string \| null` | `null`              | Maintenance day (e.g., `TUESDAY`)                                                                                                                   |
+| `maintenance_start_hour`  | `number`         | `3`                 | Hour (0–23)                                                                                                                                         |
+| `maintenance_start_minute`| `number`         | `0`                 | Minute (0–59)                                                                                                                                       |
+| `persistence_mode`        | `string`         | `"DISABLED"`        | `DISABLED` or `RDB`                                                                                                                                 |
+| `rdb_snapshot_period`     | `string`         | `"SIX_HOURS"`       | `ONE_HOUR`, `SIX_HOURS`, `TWELVE_HOURS`, `TWENTY_FOUR_HOURS`, or `MANUAL`                                                                           |
+| `kms_key_name`            | `string \| null` | `null`              | Full KMS key name (for CMEK) or `null` for default GCP encryption                                                                                   |
+| `create_firewall`         | `bool`           | `false`             | Whether to create a firewall rule for Redis port 6379                                                                                               |
+| `firewall_name`           | `string`         | `"redis-firewall-rule"` | Firewall rule name                                                                                                                             |
+| `firewall_source_ranges`  | `list(string)`   | `["10.0.0.0/8"]`    | Source IP ranges allowed on port 6379                                                                                                               |
 
-7. Exemple d’Utilisation
-7.1. Structure des fichiers
+---
 
-./
-├── main.tf
-├── variables.tf
-├── outputs.tf
-└── ...
+## Maintenance, Persistence, Security, & Encryption
 
-    Ou vous placez ce module dans un dossier, par ex. modules/gcp-redis, et vous l’appelez depuis votre configuration principale.
+### Maintenance Policy
 
-7.2. Exemple de Configuration Terraform
+- **maintenance_day**: A weekly day like `MONDAY`, `TUESDAY`, etc.  
+- **maintenance_start_hour** / **maintenance_start_minute**: Controls the UTC start time of updates.  
+- If `maintenance_day` is `null`, no custom window is set and GCP chooses automatically.
 
+### Persistence (RDB Snapshots)
+
+- **persistence_mode**: `DISABLED` or `RDB`.  
+- **rdb_snapshot_period**: frequency for RDB snapshots (`ONE_HOUR`, `SIX_HOURS`, etc.).  
+- Snapshots are stored on Google’s infrastructure with built-in encryption.
+
+### Security / Encryption
+
+1. **Encryption in Transit**  
+   - `DISABLED`: no TLS.  
+   - `SERVER_AUTHENTICATION`: TLS enabled; clients must support TLS.
+
+2. **Encryption at Rest**  
+   - **Default**: Google-managed data encryption key (DEK).  
+   - **CMEK**: Provide a user-managed KMS key name (`kms_key_name`). You must handle IAM and key rotation.
+
+### Firewall
+
+- If `create_firewall` is `true`, a `google_compute_firewall` resource is created to allow TCP port 6379 from specified `firewall_source_ranges`.  
+- This is an **internal** firewall rule, as Redis is private.
+
+---
+
+## Example Usage
+
+### File Structure
+
+./ ├── main.tf ├── variables.tf ├── outputs.tf └── ...
+
+
+> If you place these files in `modules/gcp-redis`, you can reference it as `source = "./modules/gcp-redis"`.
+
+### Terraform Configuration Example
+
+```hcl
 provider "google" {
   project = "my-gcp-project"
   region  = "us-central1"
-  # credentials = file("keys/serviceaccount.json")  # si nécessaire
+  # credentials = file("keys/serviceaccount.json")  # if needed
 }
 
 module "redis_instance" {
-  source = "./modules/gcp-redis"  # chemin vers votre module
+  source = "./modules/gcp-redis"
 
   project_id = "my-gcp-project"
   region     = "us-central1"
@@ -196,26 +212,23 @@ module "redis_instance" {
   redis_version   = "REDIS_6_X"
   auth_enabled    = true
 
-  authorized_network = "projects/my-gcp-project/global/networks/my-vpc"
-  connect_mode       = "DIRECT_PEERING"
+  authorized_network      = "projects/my-gcp-project/global/networks/my-vpc"
+  connect_mode            = "DIRECT_PEERING"
   transit_encryption_mode = "SERVER_AUTHENTICATION"
 
   maintenance_day         = "WEDNESDAY"
   maintenance_start_hour  = 2
   maintenance_start_minute= 30
 
-  persistence_mode        = "RDB"
-  rdb_snapshot_period     = "SIX_HOURS"
+  persistence_mode    = "RDB"
+  rdb_snapshot_period = "SIX_HOURS"
 
-  # Exemple si vous ne voulez pas de firewall interne
-  # create_firewall = false
-
-  # Si vous souhaitez un firewall dédié
+  # Optional firewall
   create_firewall        = true
   firewall_name          = "redis-6379"
   firewall_source_ranges = ["10.128.0.0/16"]
 
-  # CMEK (facultatif) : Définir la clé
+  # Optional CMEK
   # kms_key_name = "projects/my-gcp-project/locations/us/keyRings/my-ring/cryptoKeys/my-redis-key"
 
   redis_configs = {
@@ -227,69 +240,62 @@ output "redis_host" {
   value = module.redis_instance.redis_host
 }
 
-Commandes :
 
-terraform init
-terraform plan
-terraform apply
+Best Practices & Recommendations
 
-Terraform créera alors l’instance Redis et, si configuré, la règle firewall interne.
-8. Bonnes Pratiques et Recommandations
+    Credential Management
+        Avoid committing service account JSON keys to public repos.
+        Use a secure remote backend for terraform.tfstate.
 
-    Gestion des Credentials :
-        N’incluez jamais vos credentials (fichiers JSON) dans un dépôt public.
-        Privilégiez un backend remote sécurisé pour stocker le fichier terraform.tfstate.
+    Versioning
+        Pin your Google provider version in required_providers.
+        Keep Terraform updated, and check GCP docs for changes.
 
-    Contrôle de version :
-        Fixez la version du Provider Google dans required_providers.
-        Tenez à jour Terraform et vérifiez régulièrement les changements de la doc GCP.
+    High Availability
+        Use STANDARD_HA in production for better resilience.
+        Ensure your chosen region supports it.
 
-    Haute Disponibilité :
-        Préférez STANDARD_HA en production (résilience accrue).
-        Vérifiez que la région choisie supporte la haute disponibilité.
+    Maintenance Window
+        Schedule it outside critical production hours.
+        Track GCP notices for maintenance events.
 
-    Maintenance Window :
-        Ajustez la fenêtre de maintenance pour éviter les heures critiques de production.
-        Surveillez les notifications Google en cas de MAJ.
+    Persistence
+        Use RDB if you need data backups; otherwise DISABLED for ephemeral caching.
+        rdb_snapshot_period does not let you pick an exact daily time; GCP schedules the snapshots internally.
 
-    Persistance :
-        Définissez RDB si vous avez besoin de garder des backups de vos données.
-        Sachez que rdb_snapshot_period ne permet pas de choisir exactement l’heure de snapshot (c’est géré en interne par GCP).
+    CMEK
+        If you use a custom KMS key, ensure you’ve granted cloudkms.cryptoKeyEncrypterDecrypter to the Memorystore service account.
+        Handle key rotation and revocation policies as needed.
 
-    CMEK :
-        Assurez-vous d’avoir configuré les rôles KMS nécessaires.
-        La gestion du cycle de vie de la clé (rotation, révocation) vous incombe.
+    Separate Environments
+        Use Terraform workspaces (prod, staging, dev) or separate GCP projects.
+        Avoid mixing multiple environments in the same Terraform state.
 
-    Séparation des environnements :
-        Utilisez des workspaces Terraform (prod, staging, dev) ou des projets GCP distincts.
-        Évitez de mélanger plusieurs environnements dans le même état.
+Troubleshooting
+Issue	Possible Cause	Solution
+unsupported argument rdb_snapshot_interval	That parameter doesn’t exist in the official provider.	Use rdb_snapshot_period instead.
+unsupported block "customer_managed_key"	Your provider version may be old or it might require google-beta.	Upgrade the provider or switch to the beta provider.
+Can’t set start_time = "03:00" for maintenance	GCP requires start_time { hours, minutes } blocks in weekly_maintenance_window.	Use maintenance_day, maintenance_start_hour, maintenance_start_minute.
+illegal rdb_snapshot_start_time error	Often that field is read-only or requires RFC3339.	Remove or ignore that field; rely on rdb_snapshot_period.
+Unable to connect to Redis on port 6379	No firewall rule or incorrect firewall_source_ranges.	Check create_firewall and the source IP ranges.
+CMEK authorization error	Missing KMS IAM role for the service account.	Grant cloudkms.cryptoKeyEncrypterDecrypter to the Cloud Redis SA.
+References
 
-9. Dépannage (Troubleshooting)
-Problème	Cause Possible	Solution
-unsupported argument rdb_snapshot_interval	Ce champ n’existe plus ou n’a jamais été supporté en tant que paramètre modifiable.	Supprimer rdb_snapshot_interval ou utiliser rdb_snapshot_period.
-unsupported block "customer_managed_key"	La version du provider Google n’est pas à jour ou la fonctionnalité est en bêta.	Mettre à jour le provider ou utiliser google-beta.
-Impossible de définir start_time = "03:00"	La maintenance policy nécessite un bloc start_time { hours, minutes }.	Utiliser les variables maintenance_start_hour et maintenance_start_minute.
-Erreur illegal rdb_snapshot_start_time	GCP considère souvent ce champ comme ReadOnly (ou nécessite format RFC3339).	Retirer rdb_snapshot_start_time et se fier au scheduling interne.
-Accès au port Redis impossible	Pas de firewall configuré ou source_ranges incorrectes.	Vérifier create_firewall, firewall_source_ranges et le VPC.
-Erreur d’autorisation KMS pour CMEK	Le SA Cloud Memorystore n’a pas le rôle cloudkms.cryptoKeyEncrypterDecrypter.	Accorder les rôles nécessaires via gcloud ou la console.
-10. Références
-
-    Terraform Google Provider :
+    Terraform Google Provider
     https://registry.terraform.io/providers/hashicorp/google/latest/docs
 
-    Resource google_redis_instance :
+    google_redis_instance Resource
     https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/redis_instance
 
-    Cloud Memorystore for Redis Documentation :
+    Cloud Memorystore for Redis
     https://cloud.google.com/memorystore/docs/redis
 
-    Gestion KMS (CMEK) :
+    KMS (CMEK) Docs
     https://cloud.google.com/kms/docs
 
-    Google Compute Firewall :
+    Google Compute Firewall
     https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_firewall
 
 Conclusion
 
-Ce module Terraform propose un déploiement automatisé et sécurisé de Redis (Cloud Memorystore) sur GCP. Il inclut la configuration réseau, la politique de maintenance, la persistance des données, et la possibilité d’utiliser une clé KMS gérée par l’utilisateur pour le chiffrement au repos.
-En suivant les bonnes pratiques décrites, vous assurerez une gestion efficace de votre infrastructure Redis, tout en profitant de la fiabilité et de la scalabilité de la plateforme Google Cloud.
+This module provides an automated and secure way to deploy Redis (Cloud Memorystore) on GCP. It covers networking, maintenance policies, data persistence, and optional KMS-based encryption for data at rest. By following the best practices listed here, you will achieve a robust, scalable, and maintainable Redis infrastructure on Google Cloud.
