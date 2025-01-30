@@ -1,5 +1,5 @@
 ########################################
-# Variables principales pour l'instance
+# Project / Basic Settings
 ########################################
 
 variable "project_id" {
@@ -30,7 +30,7 @@ variable "labels" {
 }
 
 ########################################
-# Configuration Redis
+# Core Redis Configuration
 ########################################
 
 variable "tier" {
@@ -56,7 +56,7 @@ variable "memory_size_gb" {
 variable "redis_version" {
   type        = string
   description = <<EOT
-Version de Redis supportée par Cloud Memorystore:
+Version Redis supportée par Cloud Memorystore:
  - REDIS_3_2
  - REDIS_4_0
  - REDIS_5_0
@@ -65,14 +65,14 @@ EOT
   default     = "REDIS_6_X"
   validation {
     condition = contains(["REDIS_3_2", "REDIS_4_0", "REDIS_5_0", "REDIS_6_X"], var.redis_version)
-    error_message = "redis_version doit être parmi REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X."
+    error_message = "redis_version doit être REDIS_3_2, REDIS_4_0, REDIS_5_0 ou REDIS_6_X."
   }
 }
 
 variable "redis_configs" {
   type        = map(string)
   description = <<EOT
-Configuration Redis supplémentaire, par exemple:
+Configuration Redis supplémentaire. Exemple:
 {
   "maxmemory-policy"       = "allkeys-lru"
   "notify-keyspace-events" = "KEA"
@@ -83,15 +83,15 @@ EOT
 }
 
 ########################################
-# Réseau et connectivité
+# Networking
 ########################################
 
 variable "authorized_network" {
   type        = string
   description = <<EOT
-Réseau VPC où déployer Redis.
-Peut être l'URL complète (ex: projects/<project_id>/global/networks/<network_name>)
-ou simplement le nom du réseau, selon le provider.
+Réseau VPC où déployer l'instance Redis.  
+Ex: projects/<project_id>/global/networks/<network_name>
+Laisser null pour utiliser le réseau par défaut.
 EOT
   default = null
 }
@@ -136,12 +136,12 @@ EOT
 }
 
 ########################################
-# Réplicas (STANDARD_HA)
+# Replicas (for STANDARD_HA)
 ########################################
 
 variable "read_replicas_mode" {
   type        = string
-  description = "Activer ou non les réplicas en lecture : 'READ_REPLICAS_DISABLED' ou 'READ_REPLICAS_ENABLED'."
+  description = "Activer les réplicas en lecture: 'READ_REPLICAS_DISABLED' ou 'READ_REPLICAS_ENABLED'."
   default     = "READ_REPLICAS_DISABLED"
   validation {
     condition     = contains(["READ_REPLICAS_DISABLED", "READ_REPLICAS_ENABLED"], var.read_replicas_mode)
@@ -162,56 +162,63 @@ variable "replica_count" {
 ########################################
 # Maintenance Policy
 ########################################
+# GCP requires a nested `start_time { hours = X, minutes = Y }` block 
+# in weekly_maintenance_window.
+########################################
 
 variable "maintenance_day" {
   type        = string
   description = <<EOT
 Jour de maintenance planifiée.
-Doit être l'un de:
- 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
- 'FRIDAY', 'SATURDAY', 'SUNDAY'
-ou null pour ne pas définir de fenêtre.
+- L'un de: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
+- null pour ne pas configurer de fenêtre de maintenance.
 EOT
   default = null
+
   validation {
     condition = var.maintenance_day == null
-             || contains(["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"], var.maintenance_day)
-    error_message = "maintenance_day doit être l'un de (MONDAY..SUNDAY) ou null."
+             || contains(
+                  ["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"],
+                  var.maintenance_day
+                )
+    error_message = "maintenance_day doit être MONDAY..SUNDAY ou null."
   }
 }
 
-variable "maintenance_start_time" {
-  type        = string
-  description = <<EOT
-Heure de début de maintenance planifiée, au format HH:MM (UTC).
-Ex : 03:00. Laisser null pour ne pas configurer de fenêtre spécifique.
-EOT
-  default = null
+variable "maintenance_start_hour" {
+  type        = number
+  description = "Heure de début de maintenance (0-23)."
+  default     = 3
+
   validation {
-    condition = var.maintenance_start_time == null
-             || can(
-               regex(
-                 // Heure HH:MM entre 00:00 et 23:59
-                 "^(?:[0-1]\\d|2[0-3]):[0-5]\\d$",
-                 var.maintenance_start_time
-               )
-             )
-    error_message = "maintenance_start_time doit être null ou au format HH:MM (00:00 à 23:59)."
+    condition     = var.maintenance_start_hour >= 0 && var.maintenance_start_hour <= 23
+    error_message = "maintenance_start_hour doit être entre 0 et 23."
+  }
+}
+
+variable "maintenance_start_minute" {
+  type        = number
+  description = "Minute de début de maintenance (0-59)."
+  default     = 0
+
+  validation {
+    condition     = var.maintenance_start_minute >= 0 && var.maintenance_start_minute <= 59
+    error_message = "maintenance_start_minute doit être entre 0 et 59."
   }
 }
 
 ########################################
-# Persistence
+# Persistence (RDB snapshots)
 ########################################
 
 variable "persistence_mode" {
   type        = string
   description = <<EOT
 Mode de persistance:
- - DISABLED : pas de persistance
+ - DISABLED : aucune persistance
  - RDB      : snapshots sur disque
 EOT
-  default     = "DISABLED"
+  default = "DISABLED"
   validation {
     condition     = contains(["DISABLED", "RDB"], var.persistence_mode)
     error_message = "persistence_mode doit être 'DISABLED' ou 'RDB'."
@@ -234,21 +241,19 @@ EOT
       ["ONE_HOUR", "SIX_HOURS", "TWELVE_HOURS", "TWENTY_FOUR_HOURS", "MANUAL"],
       var.rdb_snapshot_period
     )
-    error_message = "rdb_snapshot_period doit être l'un de ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS ou MANUAL."
+    error_message = "rdb_snapshot_period doit être ONE_HOUR, SIX_HOURS, TWELVE_HOURS, TWENTY_FOUR_HOURS ou MANUAL."
   }
 }
 
 variable "rdb_snapshot_start_time" {
   type        = string
-  description = "Heure de début du snapshot RDB, au format HH:MM (UTC). Ex: 03:00"
+  description = "Heure de début du snapshot RDB, au format HH:MM (UTC). Ex: 03:00 (ou null)."
   default     = null
+
   validation {
     condition = var.rdb_snapshot_start_time == null
              || can(
-               regex(
-                 "^([0-1]\\d|2[0-3]):([0-5]\\d)$",
-                 var.rdb_snapshot_start_time
-               )
+               regex("^([0-1]\\d|2[0-3]):([0-5]\\d)$", var.rdb_snapshot_start_time)
              )
     error_message = "rdb_snapshot_start_time doit être null ou au format HH:MM (00:00 à 23:59)."
   }
